@@ -1,0 +1,9 @@
+# 依存ライブラリ
+node_modules/
+
+# ダウンロードした統計データ（git管理外）
+estat_shapefiles_*/
+
+# OS / エディタ
+.DS_Store
+*.log
