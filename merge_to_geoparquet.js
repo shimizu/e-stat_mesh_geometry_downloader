@@ -18,7 +18,8 @@ const UNIT = "H";
 const REPO = __dirname;
 const SRC_DIR = path.join(REPO, `estat_shapefiles_${UNIT}`);
 const OUT = path.join(REPO, `mesh_${UNIT}.parquet`);
-const DUCKDB = path.join(REPO, "bin", "duckdb");
+// Windows は duckdb.exe
+const DUCKDB = path.join(REPO, "bin", process.platform === "win32" ? "duckdb.exe" : "duckdb");
 
 // EPSG:4612 / JGD2000 の PROJJSON（gdalsrsinfo -o PROJJSON EPSG:4612 由来・実行時依存にしないため定数化）
 const PROJJSON_4612 = {
@@ -78,9 +79,12 @@ function main() {
   }
   console.log(`${zips.length} 個のZIPをマージします`);
 
+  // GDAL vsizip / DuckDB のパスは区切りを '/' に統一（Windowsのバックスラッシュ対策）
+  const fwd = (p) => p.replace(/\\/g, "/");
+
   // ZIPはinner名なしの /vsizip 直読みでOK（GDALが単一shpを自動検出）
   const selects = zips
-    .map((z) => `SELECT * FROM ST_Read('/vsizip/${path.join(SRC_DIR, z)}')`)
+    .map((z) => `SELECT * FROM ST_Read('/vsizip/${fwd(path.join(SRC_DIR, z))}')`)
     .join("\n  UNION ALL\n  ");
 
   // PROJJSON/GEO_META は二重引用符のみ → SQLのシングルクォート文字列に安全に埋め込める
@@ -90,12 +94,12 @@ COPY (
   FROM (
   ${selects}
   )
-) TO '${OUT}' (FORMAT PARQUET, KV_METADATA {geo: '${GEO_META}'});`;
+) TO '${fwd(OUT)}' (FORMAT PARQUET, KV_METADATA {geo: '${GEO_META}'});`;
 
   runDuckDB(sql);
 
   // サマリ（-noheader -list で値のみ取得）
-  const rows = runDuckDB(`SELECT count(*) FROM '${OUT}';`, [
+  const rows = runDuckDB(`SELECT count(*) FROM '${fwd(OUT)}';`, [
     "-noheader",
     "-list",
   ]).trim();
