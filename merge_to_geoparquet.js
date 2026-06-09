@@ -5,8 +5,8 @@
 //   1. estat_shapefiles_H/*.zip を列挙し /vsizip 経由で直読み（解凍不要）
 //   2. bin/duckdb (spatial) で全件 UNION ALL し native FORMAT PARQUET で出力
 //   3. ジオメトリは CAST(ST_AsWKB(geom) AS BLOB) でプレーンBLOB化し、spatial の
-//      自動 geo メタデータ生成を抑制。代わりに KV_METADATA で geo を自前指定し、
-//      CRS(EPSG:4612 のPROJJSON) を埋め込む（Python/pyarrow 不要）。
+//      自動 geo メタデータ生成を抑制。代わりに KV_METADATA で geo を自前指定する
+//      （Python/pyarrow 不要）。crs は省略＝OGC:CRS84（BigQuery 互換）。
 //
 // 依存: bin/duckdb (DuckDB 1.x CLI・spatial インストール済み) のみ。
 
@@ -21,30 +21,11 @@ const OUT = path.join(REPO, `mesh_${UNIT}.parquet`);
 // Windows は duckdb.exe
 const DUCKDB = path.join(REPO, "bin", process.platform === "win32" ? "duckdb.exe" : "duckdb");
 
-// EPSG:4612 / JGD2000 の PROJJSON（gdalsrsinfo -o PROJJSON EPSG:4612 由来・実行時依存にしないため定数化）
-const PROJJSON_4612 = {
-  type: "GeographicCRS",
-  name: "JGD2000",
-  datum: {
-    type: "GeodeticReferenceFrame",
-    name: "Japanese Geodetic Datum 2000",
-    ellipsoid: {
-      name: "GRS 1980",
-      semi_major_axis: 6378137,
-      inverse_flattening: 298.257222101,
-    },
-  },
-  coordinate_system: {
-    subtype: "ellipsoidal",
-    axis: [
-      { name: "Geodetic latitude", abbreviation: "Lat", direction: "north", unit: "degree" },
-      { name: "Geodetic longitude", abbreviation: "Lon", direction: "east", unit: "degree" },
-    ],
-  },
-  id: { authority: "EPSG", code: 4612 },
-};
-
 // GeoParquet 1.1.0 の geo メタデータ（KV_METADATA で書き込む）
+// crs は省略する。GeoParquet 仕様では crs 省略＝OGC:CRS84（WGS84 経緯度）。
+// BigQuery の GeoParquet ローダーは OGC:CRS84 のみ対応するため、EPSG:4612 等を
+// 明示すると拒否される。元データは JGD2000(EPSG:4612) だが WGS84 との差は
+// サブメートルのため、再投影せず CRS84 として出力する。
 const GEO_META = JSON.stringify({
   version: "1.1.0",
   primary_column: "geometry",
@@ -52,7 +33,7 @@ const GEO_META = JSON.stringify({
     geometry: {
       encoding: "WKB",
       geometry_types: ["Polygon"],
-      crs: PROJJSON_4612,
+      // crs 省略 ⇒ OGC:CRS84
     },
   },
 });
@@ -87,7 +68,7 @@ function main() {
     .map((z) => `SELECT * FROM ST_Read('/vsizip/${fwd(path.join(SRC_DIR, z))}')`)
     .join("\n  UNION ALL\n  ");
 
-  // PROJJSON/GEO_META は二重引用符のみ → SQLのシングルクォート文字列に安全に埋め込める
+  // GEO_META は二重引用符のみ → SQLのシングルクォート文字列に安全に埋め込める
   const sql = `LOAD spatial;
 COPY (
   SELECT * EXCLUDE (geom), CAST(ST_AsWKB(geom) AS BLOB) AS geometry
@@ -104,7 +85,7 @@ COPY (
     "-list",
   ]).trim();
   const sizeMb = (fs.statSync(OUT).size / 1024 / 1024).toFixed(1);
-  console.log(`DONE: ${OUT}  features=${rows}  size=${sizeMb}MB  crs=EPSG:4612`);
+  console.log(`DONE: ${OUT}  features=${rows}  size=${sizeMb}MB  crs=OGC:CRS84`);
 }
 
 main();

@@ -51,10 +51,10 @@ node merge_to_geoparquet.js   # estat_shapefiles_H/*.zip → mesh_H.parquet
 
 1. `fs.readdirSync` で `*.zip` を列挙し `/vsizip/<abs>/<zip>` を構築（**ZIPは解凍せず** GDAL の vsizip で直読み。inner名は不要＝GDALが単一shpを自動検出）。
 2. 全ZIPを `ST_Read(...)` の `UNION ALL` で結合。ジオメトリは `CAST(ST_AsWKB(geom) AS BLOB)` で**プレーンBLOB**に変換し（spatial の自動 `geo` メタデータ生成を抑制）、`COPY ... (FORMAT PARQUET, KV_METADATA {geo: '...'})` で出力。
-3. `geo` メタデータ（GeoParquet 1.1.0 / WKB / CRS）は **JS 側で組み立てて KV_METADATA に渡す**。CRS は EPSG:4612（JGD2000）の PROJJSON を**スクリプト内の定数** `PROJJSON_4612` に保持（実行時の gdalsrsinfo / Python 不要）。
+3. `geo` メタデータ（GeoParquet 1.1.0 / WKB）は **JS 側で組み立てて KV_METADATA に渡す**。**`crs` は省略**する（GeoParquet 仕様で省略＝`OGC:CRS84`）。**BigQuery の GeoParquet ローダーは OGC:CRS84 のみ対応**し EPSG:4612 等を明示すると拒否するため。元データは JGD2000(EPSG:4612) だが WGS84 との差はサブメートルのため再投影せず CRS84 として出力する。
 
 ### 重要な前提・制約
 - **GDAL 3.4.3 / DuckDB 0.10.2 は GeoParquet を書けない**。GDAL は Parquet ドライバ非搭載、DuckDB 0.10.2 は `geo` メタデータを出力しない。そのため DuckDB 1.x（`bin/duckdb`）が必須。
 - **ジオメトリは必ず `CAST(... AS BLOB)` でプレーンBLOB化する**こと。`ST_AsWKB` の戻り値（WKB_BLOB型）のままだと spatial が `geo` を自動生成し、`KV_METADATA` の自前 `geo` と**重複（2個）**して不正になる。
-- CRS は DuckDB の `GEOMETRY` 型が保持しないため、上記のとおり `geo` メタデータに PROJJSON を自前で埋め込む方式で付与する。
+- CRS は DuckDB の `GEOMETRY` 型が保持しないが、出力は `crs` 省略（＝OGC:CRS84）方針のため、PROJJSON の埋め込みは不要。別CRSを明示したい場合のみ `GEO_META` に `crs` を足す（ただし BigQuery 用途では OGC:CRS84 以外は不可）。
 - 入力スキーマは全ファイル統一（`KEY_CODE, MESH1_ID〜MESH4_ID, OBJ_ID, geom`）。別メッシュ単位を扱う場合は `merge_to_geoparquet.js` 冒頭の `UNIT` を変更する。

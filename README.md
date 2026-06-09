@@ -3,7 +3,7 @@
 e-Stat（政府統計の総合窓口）の統計GISから、メッシュ境界データ（Shapefile）を一括ダウンロードし、1つの **GeoParquet** ファイルにマージするツールです。
 
 - `download_estat_shapefiles.js` … e-Stat から境界 Shapefile(ZIP) を一括取得
-- `merge_to_geoparquet.js` … 取得した ZIP 群を解凍せず1つの GeoParquet に結合（CRS: EPSG:4612 / JGD2000）
+- `merge_to_geoparquet.js` … 取得した ZIP 群を解凍せず1つの GeoParquet に結合（CRS: OGC:CRS84 / WGS84 経緯度・BigQuery 互換）
 
 ## 必要なもの
 
@@ -118,13 +118,14 @@ npm run merge
 ```
 
 - `estat_shapefiles_H/*.zip` を解凍せず読み込み、1ファイル `mesh_H.parquet` を生成します。
-- 出力は GeoParquet 1.1.0 / WKB エンコーディング / CRS = **EPSG:4612 (JGD2000)**。
+- 出力は GeoParquet 1.1.0 / WKB エンコーディング / CRS = **OGC:CRS84（WGS84 経緯度）**。
+  - 元データは JGD2000(EPSG:4612) ですが、WGS84 との差はサブメートルのため再投影せず CRS84 として出力します（**BigQuery 互換**。BigQuery は OGC:CRS84 のみ受理）。
 - 別のメッシュ単位を扱う場合は `merge_to_geoparquet.js` 冒頭の定数 `UNIT` を変更してください。
 
 実行例:
 ```
 176 個のZIPをマージします
-DONE: /path/to/mesh_H.parquet  features=2006400  size=58.6MB  crs=EPSG:4612
+DONE: /path/to/mesh_H.parquet  features=2006400  size=58.6MB  crs=OGC:CRS84
 ```
 
 ---
