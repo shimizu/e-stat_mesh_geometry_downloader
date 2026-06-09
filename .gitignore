@@ -1,8 +1,13 @@
 # 依存ライブラリ
 node_modules/
 
-# ダウンロードした統計データ（git管理外）
+# ダウンロードした統計データ・生成物（git管理外）
 estat_shapefiles_*/
+*.parquet
+.mesh_*.raw.parquet
+
+# ローカル配置の DuckDB バイナリ（GitHub Releasesから取得）
+bin/
 
 # OS / エディタ
 .DS_Store
