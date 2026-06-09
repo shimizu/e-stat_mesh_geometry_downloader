@@ -4,6 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "download": "node download_estat_shapefiles.js",
+    "merge": "node merge_to_geoparquet.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
