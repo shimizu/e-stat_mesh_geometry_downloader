@@ -96,13 +96,27 @@ async function main() {
 
     let pageDownloads = 0;
 
+    // 出力ディレクトリの既存ファイル一覧（ページごとに1回だけ読む）
+    const existingFiles = fs.readdirSync(OUT_DIR);
+
     for (let i = 0; i < hrefs.length; i++) {
       const href = hrefs[i];
 
       try {
-        // 一旦ファイル名を code から仮決め（フォールバック用）
         const codeMatch = href.match(/[?&]code=([^&]+)/);
-        const fallback = `${UNIT}_${codeMatch ? codeMatch[1] : `p${pageNo}_${i}`}.zip`;
+        const code = codeMatch ? codeMatch[1] : null;
+        const fallback = `${UNIT}_${code ?? `p${pageNo}_${i}`}.zip`;
+
+        // リクエスト前チェック:
+        //   e-Stat の Shapefile はファイル名にメッシュコード(code)を含むため、
+        //   code を含む既存ファイルがあればHTTPリクエスト自体をスキップする。
+        if (code) {
+          const hit = existingFiles.find((f) => f.includes(code));
+          if (hit) {
+            console.log(`skip existing (pre-check): ${hit}`);
+            continue;
+          }
+        }
 
         const resp = await context.request.get(href, { timeout: 60_000 });
         if (!resp.ok()) {
@@ -116,11 +130,13 @@ async function main() {
         );
         const savePath = path.join(OUT_DIR, filename);
 
+        // 事後チェック（codeが取れなかったURL用のフォールバック）
         if (fs.existsSync(savePath)) {
           console.log(`skip existing: ${savePath}`);
         } else {
           const body = await resp.body();
           fs.writeFileSync(savePath, body);
+          existingFiles.push(filename); // 既存一覧にも反映
           console.log(`saved: ${savePath} (${body.length} bytes)`);
           totalDownloads++;
           pageDownloads++;

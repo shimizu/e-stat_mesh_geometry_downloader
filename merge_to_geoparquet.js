@@ -14,7 +14,7 @@ const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
 
-const UNIT = "H";
+const UNIT = "E";
 const REPO = __dirname;
 const SRC_DIR = path.join(REPO, `estat_shapefiles_${UNIT}`);
 const OUT = path.join(REPO, `mesh_${UNIT}.parquet`);
